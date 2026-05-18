@@ -4,6 +4,7 @@ import { persist } from 'zustand/middleware'
 export interface User {
   name: string;
   email: string;
+  profilePic?: string;
 }
 
 export interface RegisteredUser {
@@ -35,6 +36,7 @@ export interface Task {
     title: string;
     startDate?: string;
     dueDate?: string;
+    completed?: boolean;
   }[];
   startDate?: string;
   dueDate?: string;
@@ -53,6 +55,9 @@ export interface Note {
   content: string;
   folderId?: string;
   updatedAt: Date;
+  description?: string;
+  subNotes?: { id: string; text: string; completed: boolean }[];
+  savepoints?: { id: string; label: string; timestamp: string }[];
 }
 
 export interface AttendanceRecord {
@@ -129,11 +134,14 @@ interface StoreState {
   updateTaskStatus: (taskId: string, status: Task['status']) => void;
   editTask: (taskId: string, updatedTask: Partial<Task>) => void;
   deleteTask: (taskId: string) => void;
+  toggleTaskTopicCompleted: (taskId: string, topicTitle: string) => void;
   addExam: (exam: Exam) => void;
   updateStats: (newStats: Partial<Stats>) => void;
   
   addNote: (note: Note) => void;
   updateNote: (id: string, content: string) => void;
+  editNote: (id: string, updatedNote: Partial<Note>) => void;
+  deleteNote: (id: string) => void;
   
   addAttendanceRecord: (record: AttendanceRecord) => void;
   updateAttendance: (id: string, attended: number, total: number) => void;
@@ -172,7 +180,7 @@ const initialWeeklyData: WeeklyData[] = [
 
 export const useStore = create<StoreState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       tasks: [],
       exams: [],
@@ -193,18 +201,32 @@ export const useStore = create<StoreState>()(
         // 1. Save the previous user's data before logging out or switching
         if (state.user) {
           const prevEmail = state.user.email.toLowerCase();
-          updatedUserDataByEmail[prevEmail] = {
-            tasks: state.tasks,
-            exams: state.exams,
-            stats: state.stats,
-            weeklyData: state.weeklyData,
-            notes: state.notes,
-            attendanceRecords: state.attendanceRecords,
-            timetableSlots: state.timetableSlots,
-            semesters: state.semesters,
-            goals: state.goals,
-            lastVisitedPath: state.lastVisitedPath
-          };
+          const existingData = state.userDataByEmail[prevEmail];
+          
+          // Defensive Lock: Only save if we have actual active content, OR if no data exists yet.
+          // This prevents empty unhydrated states from wiping out valid user databases!
+          const hasActiveContent = 
+            state.tasks.length > 0 || 
+            state.notes.length > 0 || 
+            state.attendanceRecords.length > 0 || 
+            state.timetableSlots.length > 0 || 
+            state.semesters.length > 0 || 
+            state.goals.length > 0;
+
+          if (hasActiveContent || !existingData) {
+            updatedUserDataByEmail[prevEmail] = {
+              tasks: state.tasks,
+              exams: state.exams,
+              stats: state.stats,
+              weeklyData: state.weeklyData,
+              notes: state.notes,
+              attendanceRecords: state.attendanceRecords,
+              timetableSlots: state.timetableSlots,
+              semesters: state.semesters,
+              goals: state.goals,
+              lastVisitedPath: state.lastVisitedPath
+            };
+          }
         }
 
         // 2. If new user is null, reset active states
@@ -229,9 +251,17 @@ export const useStore = create<StoreState>()(
         const newEmail = user.email.toLowerCase();
         const savedData = updatedUserDataByEmail[newEmail];
 
+        // Synchronize edited profile details back into the registered users database
+        const updatedRegisteredUsers = state.registeredUsers.map(u => 
+          u.email.toLowerCase() === newEmail 
+            ? { ...u, name: user.name, profilePic: user.profilePic } 
+            : u
+        );
+
         if (savedData) {
           return {
             user,
+            registeredUsers: updatedRegisteredUsers,
             userDataByEmail: updatedUserDataByEmail,
             tasks: savedData.tasks || [],
             exams: savedData.exams || [],
@@ -247,6 +277,7 @@ export const useStore = create<StoreState>()(
         } else {
           return {
             user,
+            registeredUsers: updatedRegisteredUsers,
             userDataByEmail: updatedUserDataByEmail,
             tasks: [],
             exams: [],
@@ -286,6 +317,16 @@ export const useStore = create<StoreState>()(
         tasks: state.tasks.filter((t) => t.id !== taskId)
       })),
 
+      toggleTaskTopicCompleted: (taskId, topicTitle) => set((state) => ({
+        tasks: state.tasks.map((t) => {
+          if (t.id !== taskId) return t
+          const updatedTopics = (t.topics || []).map((tp) => 
+            tp.title === topicTitle ? { ...tp, completed: !tp.completed } : tp
+          )
+          return { ...t, topics: updatedTopics }
+        })
+      })),
+
       addExam: (exam) => set((state) => ({ exams: [...state.exams, exam] })),
       
       updateStats: (newStats) => set((state) => ({
@@ -295,6 +336,12 @@ export const useStore = create<StoreState>()(
       addNote: (note) => set((state) => ({ notes: [...state.notes, note] })),
       updateNote: (id, content) => set((state) => ({
         notes: state.notes.map(n => n.id === id ? { ...n, content, updatedAt: new Date() } : n)
+      })),
+      editNote: (id, updatedNote) => set((state) => ({
+        notes: state.notes.map(n => n.id === id ? { ...n, ...updatedNote, updatedAt: new Date() } : n)
+      })),
+      deleteNote: (id) => set((state) => ({
+        notes: state.notes.filter(n => n.id !== id)
       })),
 
       addAttendanceRecord: (record) => set((state) => ({ attendanceRecords: [...state.attendanceRecords, record] })),
@@ -372,6 +419,21 @@ export const useStore = create<StoreState>()(
     }),
     {
       name: 'smart-study-storage',
+      partialize: (state) => ({
+        user: state.user,
+        tasks: state.tasks,
+        exams: state.exams,
+        stats: state.stats,
+        weeklyData: state.weeklyData,
+        notes: state.notes,
+        attendanceRecords: state.attendanceRecords,
+        timetableSlots: state.timetableSlots,
+        semesters: state.semesters,
+        goals: state.goals,
+        registeredUsers: state.registeredUsers,
+        userDataByEmail: state.userDataByEmail,
+        lastVisitedPath: state.lastVisitedPath,
+      }),
     }
   )
 )

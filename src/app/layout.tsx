@@ -7,6 +7,9 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Smart Study Planner | Premium EdTech Dashboard",
   description: "An AI-powered digital command center for students.",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
 export default function RootLayout({

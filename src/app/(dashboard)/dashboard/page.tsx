@@ -3,12 +3,12 @@ import React from 'react'
 import { motion, Variants } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
-import { Flame, Clock, Target, CheckCircle2, TrendingUp, BookOpen, ChevronRight } from 'lucide-react'
-
+import { Clock, CheckCircle2, BookOpen, ChevronRight, ListTodo, Circle } from 'lucide-react'
+import Link from 'next/link'
 import { useStore } from '@/store/useStore'
 
 export default function Dashboard() {
-  const { user, tasks, exams, stats, updateTaskStatus, attendanceRecords } = useStore()
+  const { user, tasks, stats, attendanceRecords, toggleTaskTopicCompleted } = useStore()
   
   // Calculate completed tasks dynamically
   const completedTasksCount = tasks.filter(t => t.status === 'done').length
@@ -18,9 +18,12 @@ export default function Dashboard() {
   const totalSessions = attendanceRecords.reduce((acc, curr) => acc + curr.total, 0)
   const avgAttendance = totalSessions === 0 ? 0 : Math.round((totalAttended / totalSessions) * 100)
 
-  // Get top 3 tasks and exams
-  const recentTasks = tasks.slice(0, 3)
-  const upcomingExams = exams.slice(0, 3)
+  // Get top 5 tasks
+  const recentTasks = tasks.slice(0, 5)
+
+  // Get first in-progress task for "Current Progress" widget
+  const currentProgressTask = tasks.find(t => t.status === 'in-progress')
+
   const containerVariants = {
     hidden: { opacity: 0 },
     show: {
@@ -38,41 +41,88 @@ export default function Dashboard() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-10">
+      {/* Welcome Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-white">Welcome back, {user?.name || 'Student'}</h1>
           <p className="text-gray-400 mt-1">Here is your academic overview for today.</p>
         </div>
-        
-        <div className="flex gap-3">
-          <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-4 py-2 backdrop-blur-md">
-            <Flame className="h-5 w-5 text-orange-500" />
-            <span className="font-bold text-white">{stats.streak} Day Streak</span>
-          </div>
-          <div className="flex items-center gap-2 bg-brand-electric/10 border border-brand-electric/20 rounded-xl px-4 py-2 backdrop-blur-md">
-            <Target className="h-5 w-5 text-brand-electric" />
-            <span className="font-bold text-brand-electric">0% Goal</span>
-          </div>
-        </div>
       </div>
 
+      {/* Grid Stats cards */}
       <motion.div 
         variants={containerVariants} 
         initial="hidden" 
         animate="show" 
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+        className="grid grid-cols-1 md:grid-cols-3 gap-6"
       >
         <motion.div variants={itemVariants}>
-          <Card premium className="h-full">
+          <Card premium className="h-full border-brand-electric/20 bg-brand-electric/5">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-400">Total Study Hours</CardTitle>
-              <Clock className="h-4 w-4 text-brand-blue" />
+              <CardTitle className="text-sm font-medium text-gray-400">Current Progress</CardTitle>
+              <Clock className="h-4 w-4 text-brand-electric animate-pulse" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-white">{stats.studyHours}h</div>
-              <p className="text-xs text-brand-neon mt-1 flex items-center">
-                <TrendingUp className="mr-1 h-3 w-3" /> +0% from last week
-              </p>
+              {currentProgressTask ? (
+                <div className="space-y-3">
+                  <div className="text-base font-bold text-white truncate max-w-full" title={currentProgressTask.title}>
+                    {currentProgressTask.title}
+                  </div>
+                  
+                  {/* Interactive Checklist subtopics */}
+                  {currentProgressTask.topics && currentProgressTask.topics.length > 0 ? (
+                    <div className="space-y-1 max-h-24 overflow-y-auto pr-1 custom-scrollbar">
+                      {currentProgressTask.topics.map((topic) => (
+                        <div 
+                          key={topic.title}
+                          onClick={() => toggleTaskTopicCompleted(currentProgressTask.id, topic.title)}
+                          className="flex items-center gap-2 cursor-pointer p-1 rounded hover:bg-white/5 transition-all text-xs font-semibold"
+                        >
+                          {topic.completed ? (
+                            <CheckCircle2 className="h-3.5 w-3.5 text-brand-electric shrink-0" />
+                          ) : (
+                            <Circle className="h-3.5 w-3.5 text-gray-600 shrink-0 opacity-40" />
+                          )}
+                          <span className={`truncate ${topic.completed ? 'line-through text-gray-500' : 'text-gray-300'}`}>
+                            {topic.title}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-gray-500 font-semibold italic">No sub-topics added. Set up in Tasks page.</p>
+                  )}
+
+                  {/* Dynamically calculated progress bar */}
+                  <div className="space-y-1.5 mt-2">
+                    <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold">
+                      <span>COMPLETION</span>
+                      <span className="text-white">
+                        {currentProgressTask.topics && currentProgressTask.topics.length > 0 
+                          ? `${Math.round((currentProgressTask.topics.filter(t => t.completed).length / currentProgressTask.topics.length) * 100)}%` 
+                          : '0%'}
+                      </span>
+                    </div>
+                    <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
+                      <div 
+                        className="bg-brand-electric h-1.5 rounded-full transition-all duration-500" 
+                        style={{ 
+                          width: `${currentProgressTask.topics && currentProgressTask.topics.length > 0 
+                            ? (currentProgressTask.topics.filter(t => t.completed).length / currentProgressTask.topics.length) * 100 
+                            : 0}%` 
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <div className="text-base font-bold text-gray-500">No Active Tasks</div>
+                  <p className="text-[11px] text-gray-400 font-semibold mt-1">
+                    <Link href="/tasks" className="text-brand-electric hover:underline">Start a task in workspace →</Link>
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>
@@ -85,8 +135,8 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-white">{completedTasksCount}</div>
-              <p className="text-xs text-gray-500 mt-1">
-                {tasks.filter(t => t.status !== 'done').length} remaining
+              <p className="text-xs text-gray-500 mt-2 font-semibold">
+                {tasks.filter(t => t.status !== 'done').length} remaining to finish
               </p>
             </CardContent>
           </Card>
@@ -106,103 +156,86 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </motion.div>
-
-        <motion.div variants={itemVariants}>
-          <Card className="h-full border-brand-electric/30 bg-brand-electric/5 backdrop-blur-md">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-brand-electric">Current Focus</CardTitle>
-              {tasks.some(t => t.status === 'in-progress') && (
-                <span className="relative flex h-3 w-3">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-electric opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-brand-electric"></span>
-                </span>
-              )}
-            </CardHeader>
-            <CardContent>
-              {tasks.some(t => t.status === 'in-progress') ? (
-                <>
-                  <div className="text-xl font-bold text-white mb-1 truncate">
-                    {tasks.find(t => t.status === 'in-progress')?.title}
-                  </div>
-                  <p className="text-xs text-brand-electric/80">Currently working</p>
-                </>
-              ) : (
-                <>
-                  <div className="text-xl font-bold text-gray-500 mb-1">Not Focused</div>
-                  <p className="text-xs text-gray-600">Start a task to track</p>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
       </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <Card premium className="h-full">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Recent Tasks</CardTitle>
-              <div className="text-sm text-brand-blue cursor-pointer hover:underline flex items-center">
-                View all <ChevronRight className="h-4 w-4 ml-1" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {recentTasks.length === 0 ? (
-                  <div className="text-sm text-gray-500 text-center py-4">No tasks yet. Create one to get started!</div>
-                ) : (
-                  recentTasks.map(task => (
-                    <div key={task.id} className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-colors border border-transparent hover:border-white/5">
-                      <div className="flex items-center gap-3">
-                        <button 
-                          onClick={() => updateTaskStatus(task.id, task.status === 'done' ? 'todo' : 'done')}
-                          className={`h-5 w-5 rounded-md border flex items-center justify-center transition-all ${task.status === 'done' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-500' : 'border-white/20 hover:border-emerald-500/55'}`}
-                        >
-                          {task.status === 'done' && <CheckCircle2 className="h-3 w-3" />}
-                        </button>
-                        <span className={task.status === 'done' ? 'line-through text-gray-500 transition-all' : 'text-white transition-all'}>{task.title}</span>
+      {/* Full-width Tasks section */}
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+      >
+        <Card premium className="w-full overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between border-b border-white/5 pb-4">
+            <div className="flex items-center gap-2">
+              <ListTodo className="h-5 w-5 text-brand-electric" />
+              <CardTitle className="text-lg">Recent Tasks & Assignments</CardTitle>
+            </div>
+            <Link href="/tasks" className="text-sm text-brand-blue hover:underline flex items-center gap-1 font-semibold transition-colors">
+              View all tasks <ChevronRight className="h-4 w-4" />
+            </Link>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="space-y-3">
+              {recentTasks.length === 0 ? (
+                <div className="text-sm text-gray-500 text-center py-8">
+                  No tasks recorded yet. Create them inside your Tasks workspace to start tracking!
+                </div>
+              ) : (
+                recentTasks.map(task => (
+                  <div 
+                    key={task.id} 
+                    className="flex items-center justify-between p-3.5 rounded-2xl bg-white/5 border border-white/5 hover:border-white/10 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      {/* Read-only static visual indicator */}
+                      <div className={`h-5 w-5 rounded-md border flex items-center justify-center shrink-0 ${
+                        task.status === 'done' 
+                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
+                          : 'border-white/10 text-gray-600'
+                      }`}>
+                        {task.status === 'done' ? (
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                        ) : (
+                          <Circle className="h-3 w-3 opacity-20" />
+                        )}
                       </div>
-                      {task.tags && task.tags.length > 0 && (
-                        <Badge variant="outline">{task.tags[0]}</Badge>
+                      <span className={`text-sm font-medium ${
+                        task.status === 'done' 
+                          ? 'line-through text-gray-500' 
+                          : 'text-white'
+                      }`}>
+                        {task.title}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {task.priority && (
+                        <Badge 
+                          variant="outline" 
+                          className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 ${
+                            task.priority === 'high' 
+                              ? 'border-red-500/30 text-red-400 bg-red-500/5' 
+                              : task.priority === 'medium'
+                                ? 'border-orange-500/30 text-orange-400 bg-orange-500/5'
+                                : 'border-blue-500/30 text-blue-400 bg-blue-500/5'
+                          }`}
+                        >
+                          {task.priority}
+                        </Badge>
+                      )}
+                      {task.status === 'done' ? (
+                        <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] uppercase font-bold tracking-wider">Completed</Badge>
+                      ) : (
+                        <Badge variant="secondary" className="text-[10px] uppercase font-bold tracking-wider bg-white/5 border border-white/5">In Progress</Badge>
                       )}
                     </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-        
-        <div>
-          <Card premium className="h-full">
-            <CardHeader>
-              <CardTitle>Upcoming Exams</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {upcomingExams.length === 0 ? (
-                  <div className="text-sm text-gray-500 text-center py-4">No upcoming exams scheduled.</div>
-                ) : (
-                  upcomingExams.map(exam => (
-                    <div key={exam.id} className="flex flex-col p-4 rounded-xl bg-white/5 border border-white/5">
-                      <div className="flex justify-between items-start mb-2">
-                        <h4 className="font-semibold text-white">{exam.title}</h4>
-                        <Badge variant={exam.priority === 'critical' ? 'destructive' : 'secondary'}>
-                          {exam.priority}
-                        </Badge>
-                      </div>
-                      <div className="text-sm text-gray-400 flex items-center gap-2">
-                        <Clock className="h-3 w-3" />
-                        {new Date(exam.date).toLocaleDateString()}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
     </div>
   )
 }

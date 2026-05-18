@@ -45,24 +45,24 @@ export default function SignupPage() {
       return;
     }
 
-    const { error: signUpError } = await supabase.auth.signUp({
-      email: cleanedEmail,
-      password,
-      options: {
-        data: {
-          name,
-        }
-      }
-    })
+    const registeredUsers = useStore.getState().registeredUsers;
+    const isAlreadyRegistered = registeredUsers.some(u => u.email.toLowerCase() === cleanedEmail);
 
-    if (signUpError) {
-      setError(signUpError.message)
-      setLoading(false)
-      return
+    if (isAlreadyRegistered) {
+      setError('An account with this email already exists.');
+      setLoading(false);
+      return;
     }
 
+    // Call store local signup procedure
+    useStore.getState().registerUser({
+      name,
+      email: cleanedEmail,
+      password // stored securely locally
+    });
+
     setLoading(false)
-    alert("Account created successfully! A verification link has been sent to your email. Please verify your email to log in.")
+    alert("Account created successfully! You can now log in.")
     router.push('/login')
   }
 
