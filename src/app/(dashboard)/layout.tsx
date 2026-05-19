@@ -4,6 +4,8 @@ import { useRouter, usePathname } from 'next/navigation'
 import { Sidebar } from "@/components/layout/Sidebar"
 import { Navbar } from "@/components/layout/Navbar"
 import { useStore } from '@/store/useStore'
+import { supabase } from '@/lib/supabase'
+import { syncService } from '@/lib/syncService'
 
 // Mouse-reactive premium interactive grid & particle wallpaper for Dashboard
 const InteractiveWallpaper = () => {
@@ -143,29 +145,87 @@ export default function DashboardLayout({
 }) {
   const router = useRouter()
   const pathname = usePathname()
-  const { user, setUser, setLastVisitedPath } = useStore()
+  const { user, setUser, setLastVisitedPath, resetData } = useStore()
   const [mounted, setMounted] = React.useState(false)
+  const [checkingAuth, setCheckingAuth] = React.useState(true)
 
   React.useEffect(() => {
-    const sessionActive = sessionStorage.getItem('smart-study-session')
-    if (!sessionActive) {
-      setUser(null)
-    }
     setMounted(true)
-  }, [setUser])
+  }, [])
 
   React.useEffect(() => {
-    if (mounted) {
-      if (!user) {
+    async function validateAuth() {
+      const sessionActive = sessionStorage.getItem('smart-study-session')
+      
+      if (!sessionActive || !user) {
+        setUser(null)
+        setCheckingAuth(false)
         router.push('/login')
-      } else {
+        return
+      }
+
+      try {
+        // 1. Verify active Supabase Auth session
+        const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
+        
+        if (authError || !authUser) {
+          // No active auth session found
+          sessionStorage.removeItem('smart-study-session')
+          setUser(null)
+          resetData()
+          setCheckingAuth(false)
+          router.push('/login')
+          return
+        }
+
+        // 2. Fetch corresponding app profile from Supabase profiles table
+        const profile = await syncService.getUserProfileById(authUser.id)
+        
+        if (!profile) {
+          // Profile row is missing
+          await supabase.auth.signOut()
+          sessionStorage.removeItem('smart-study-session')
+          setUser(null)
+          resetData()
+          setCheckingAuth(false)
+          alert("Access blocked: Profile not found. Please register/sign up first.")
+          router.push('/login')
+          return
+        }
+
+        // 3. Check for soft-deletion (is_deleted column protection)
+        if (profile.is_deleted) {
+          await supabase.auth.signOut()
+          sessionStorage.removeItem('smart-study-session')
+          setUser(null)
+          resetData()
+          setCheckingAuth(false)
+          alert("Access blocked: This account has been deleted.")
+          router.push('/login')
+          return
+        }
+
+        // Validation successful! Safe to proceed.
         setLastVisitedPath(pathname)
+        setCheckingAuth(false)
+      } catch (err) {
+        console.error("Auth validation error inside route guard:", err)
+        setCheckingAuth(false)
       }
     }
-  }, [user, pathname, router, setLastVisitedPath, mounted])
 
-  if (!user && mounted) {
-    return null // Will redirect in useEffect
+    if (mounted) {
+      validateAuth()
+    }
+  }, [mounted, user, pathname, router, setUser, setLastVisitedPath, resetData])
+
+  if ((!user || checkingAuth) && mounted) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0b] text-white flex flex-col justify-center items-center">
+        <div className="h-8 w-8 border-2 border-brand-electric border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-xs text-gray-500 mt-4 font-semibold tracking-wide">Securing dashboard session...</p>
+      </div>
+    )
   }
 
   return (

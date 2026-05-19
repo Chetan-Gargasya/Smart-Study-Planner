@@ -24,21 +24,13 @@ export default function CGPAPage() {
   // Navigation tabs: cgpa (semester-wise) or sgpa (course-wise)
   const [activeTab, setActiveTab] = useState<'cgpa' | 'sgpa'>('cgpa')
 
-  // --- CGPA CALCULATOR STATE ---
-  // Default values matching user's screenshot for instant wow factor!
-  const [semesters, setSemesters] = useState<SemesterInput[]>([
-    { id: '1', name: 'SEMESTER 1', sgpa: '7.7', credits: '17.5' },
-    { id: '2', name: 'SEMESTER 2', sgpa: '7.9', credits: '22' }
-  ])
-  const [calculatedCgpa, setCalculatedCgpa] = useState<number | null>(7.81)
+    // --- CGPA CALCULATOR STATE ---
+  const [semesters, setSemesters] = useState<SemesterInput[]>([])
+  const [calculatedCgpa, setCalculatedCgpa] = useState<number | null>(null)
 
-  // --- SGPA CALCULATOR STATE ---
-  const [courses, setCourses] = useState<CourseInput[]>([
-    { id: '1', name: 'Mathematics-I', credits: '4', gradePoints: '10' },
-    { id: '2', name: 'Basic Electrical Eng', credits: '3', gradePoints: '9' },
-    { id: '3', name: 'Applied Chemistry', credits: '4', gradePoints: '8' }
-  ])
-  const [calculatedSgpa, setCalculatedSgpa] = useState<number | null>(8.91)
+    // --- SGPA CALCULATOR STATE ---
+  const [courses, setCourses] = useState<CourseInput[]>([])
+  const [calculatedSgpa, setCalculatedSgpa] = useState<number | null>(null)
 
   // New Course Inputs
   const [newCourseName, setNewCourseName] = useState('')
@@ -303,7 +295,7 @@ export default function CGPAPage() {
               onClick={handleCalculateCgpa}
               className="w-full h-12 text-sm font-bold uppercase tracking-wider rounded-2xl shadow-xl shadow-brand-electric/15"
             >
-              Calculate CGPA
+              CALCULATE CGPA
             </Button>
 
             {/* CALCULATED RESULT PANEL */}
@@ -444,14 +436,14 @@ export default function CGPAPage() {
                 onClick={handleCalculateSgpa}
                 className="h-11 border-brand-purple/20 bg-brand-purple/5 hover:bg-brand-purple/10 text-brand-purple font-bold uppercase tracking-wider rounded-2xl flex items-center justify-center gap-2"
               >
-                Calculate SGPA
+                CALCULATE SGPA
               </Button>
               <Button 
                 variant="outline" 
                 onClick={handleResetSGPA}
                 className="h-11 border-red-500/20 bg-red-500/5 text-red-400 hover:bg-red-500/10 font-bold uppercase tracking-wider rounded-2xl flex items-center justify-center gap-2"
               >
-                <RotateCcw className="h-4 w-4" /> Reset List
+                <RotateCcw className="h-4 w-4" /> RESET LIST
               </Button>
             </div>
 

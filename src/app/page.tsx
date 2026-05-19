@@ -1,4 +1,5 @@
 "use client"
+import { supabase } from "@/lib/supabase";
 import React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -137,8 +138,8 @@ const InteractiveWallpaper = () => {
   }, [])
 
   return (
-    <canvas 
-      ref={canvasRef} 
+    <canvas
+      ref={canvasRef}
       className="absolute inset-0 w-full h-full pointer-events-none z-0 opacity-80"
     />
   )
@@ -146,16 +147,20 @@ const InteractiveWallpaper = () => {
 
 export default function LandingPage() {
   const router = useRouter()
-  const { user } = useStore()
+  const { user, setUser } = useStore()
   const [mounted, setMounted] = React.useState(false)
 
   React.useEffect(() => {
+    const sessionActive = sessionStorage.getItem('smart-study-session')
+    if (!sessionActive && useStore.getState().user) {
+      setUser(null)
+    }
     setMounted(true)
-  }, [])
+  }, [setUser])
 
   return (
     <div className="min-h-screen text-white overflow-hidden selection:bg-brand-purple/30 bg-[#0a0a0b] relative">
-      
+
       {/* Dynamic Constellation Grid Interactive Wallpaper */}
       <InteractiveWallpaper />
 
@@ -214,16 +219,16 @@ export default function LandingPage() {
             <span className="flex h-2 w-2 rounded-full bg-brand-electric animate-pulse"></span>
             The Ultimate Command Center for Students
           </div>
-          
+
           <h1 className="text-5xl sm:text-7xl font-extrabold tracking-tight mb-8 bg-clip-text text-transparent bg-gradient-to-b from-white to-white/60">
             Master your studies with <br className="hidden sm:block" />
             <span className="bg-premium-gradient bg-clip-text text-transparent">AI-powered</span> precision.
           </h1>
-          
+
           <p className="text-lg sm:text-xl text-gray-300 italic mb-10 max-w-2xl mx-auto leading-relaxed font-medium">
             "The beautiful thing about learning is that no one can take it away from you."
           </p>
-          
+
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             {mounted && user ? (
               <Link href="/dashboard" className="w-full sm:w-auto">

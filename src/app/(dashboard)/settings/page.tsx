@@ -9,6 +9,8 @@ import {
   Smartphone, Shield, Check, Info, FileText, Bug 
 } from 'lucide-react'
 import { useStore } from '@/store/useStore'
+import { syncService } from '@/lib/syncService'
+import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -33,6 +35,10 @@ export default function SettingsPage() {
 
   // --- HELP TAB DATA ---
   const [activeHelpSection, setActiveHelpSection] = useState<string>('help-center')
+
+  // --- SYNC BATCH SNAPSHOT DATA ---
+  const [syncing, setSyncing] = useState(false)
+  const [syncSuccessMsg, setSyncSuccessMsg] = useState(false)
 
   // Preset avatar graphics
   const PRESET_AVATARS = [
@@ -77,6 +83,29 @@ export default function SettingsPage() {
     setTimeout(() => setProfileSavedMsg(false), 3000)
   }
 
+  const handleManualSync = async () => {
+    if (!user) return
+    setSyncing(true)
+    setSyncSuccessMsg(false)
+    try {
+      await syncService.pushAllUserData(user.email, {
+        tasks: useStore.getState().tasks,
+        notes: useStore.getState().notes,
+        attendanceRecords: useStore.getState().attendanceRecords,
+        semesters: useStore.getState().semesters,
+        goals: useStore.getState().goals,
+        timetableSlots: useStore.getState().timetableSlots
+      })
+      setSyncSuccessMsg(true)
+      setTimeout(() => setSyncSuccessMsg(false), 4000)
+    } catch (err) {
+      console.error("Manual snapshot sync failed:", err)
+      alert("Failed to sync clean snapshot. Please try again.")
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -103,12 +132,43 @@ export default function SettingsPage() {
     setProfilePicBase64(undefined)
   }
 
-  const handleDeleteAccount = () => {
-    if (confirm("🚨 WARNING: Are you sure you want to completely delete your account and wipe all your saved planner data? This action cannot be undone.")) {
-      resetData()
-      setUser(null)
-      sessionStorage.removeItem('smart-study-session')
-      router.push('/')
+  const handleDeleteAccount = async () => {
+    if (!user) return
+
+    const firstConfirm = confirm(
+      "🚨 CRITICAL WARNING - ACCOUNT DELETION:\n\n" +
+      "Are you sure you want to completely delete your account?\n\n" +
+      "This will permanently delete your user profile and wipe ALL your tasks, notes, goals, attendance, and weekly timetable schedules from our cloud database.\n\n" +
+      "You will NOT be able to log in with this account again unless you sign up and register first! This action cannot be undone."
+    )
+
+    if (firstConfirm) {
+      const secondConfirm = confirm(
+        "⚠️ FINAL CONFIRMATION:\n\n" +
+        "Are you absolutely positive? All your data will be permanently destroyed on both Vercel cloud and local caches.\n\n" +
+        "Click OK to permanently delete your account."
+      )
+
+      if (secondConfirm) {
+        try {
+          if (user.id) {
+            // Mark is_deleted to true in profiles table
+            await syncService.deleteUserProfile(user.id)
+          }
+          // Native Supabase Sign Out
+          await supabase.auth.signOut()
+        } catch (err) {
+          console.error("Failed to delete cloud profile:", err)
+        }
+
+        // Clean up local store and session
+        resetData()
+        setUser(null)
+        sessionStorage.removeItem('smart-study-session')
+        
+        alert("Your account and all associated study planner data have been permanently deleted.")
+        router.push('/')
+      }
     }
   }
 
@@ -254,6 +314,42 @@ export default function SettingsPage() {
                       </Button>
                       {accountSavedMsg && (
                         <span className="text-xs text-emerald-400 font-bold animate-pulse">Changes saved successfully!</span>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Cloud Backup & Synchronisation card */}
+                <Card premium className="bg-[#0a0a0b]/80 border-white/10 p-6">
+                  <CardHeader className="px-0 pt-0">
+                    <CardTitle className="text-xl font-bold text-white flex items-center gap-2">
+                      ☁️ Manual Cloud Synchronization
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="px-0 pb-0 space-y-4">
+                    <p className="text-xs text-gray-400 leading-relaxed font-semibold">
+                      Is your database getting messy? Click below to wipe all old database records and upload a clean, fresh, pristine snapshot of your current local study plan details (tasks, notes, goals, schedule slots, attendance) directly to Supabase now.
+                    </p>
+                    <div className="pt-2 flex items-center gap-4">
+                      <Button 
+                        variant="premium" 
+                        onClick={handleManualSync}
+                        disabled={syncing}
+                        className="h-11 px-6 text-sm font-bold uppercase tracking-wider rounded-2xl bg-brand-electric hover:bg-brand-electric/90 flex items-center gap-2 shadow-lg shadow-brand-electric/20"
+                      >
+                        {syncing ? (
+                          <>
+                            <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            Syncing Snapshot...
+                          </>
+                        ) : (
+                          <>
+                            ☁️ Sync Clean Snapshot
+                          </>
+                        )}
+                      </Button>
+                      {syncSuccessMsg && (
+                        <span className="text-xs text-emerald-400 font-bold animate-pulse">Sync completed! Clean database snapshot saved.</span>
                       )}
                     </div>
                   </CardContent>

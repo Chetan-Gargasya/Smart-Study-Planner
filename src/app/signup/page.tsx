@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input'
 import { GraduationCap, ArrowRight, AlertCircle } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { supabase } from '@/lib/supabase'
+import { syncService } from '@/lib/syncService'
 
 export default function SignupPage() {
   const router = useRouter()
@@ -19,9 +20,13 @@ export default function SignupPage() {
   const { user, setUser, resetData } = useStore()
   const [mounted, setMounted] = React.useState(false)
 
-  React.useEffect(() => {
+    React.useEffect(() => {
+    const sessionActive = sessionStorage.getItem('smart-study-session')
+    if (!sessionActive && useStore.getState().user) {
+      setUser(null)
+    }
     setMounted(true)
-  }, [])
+  }, [setUser])
 
   const handleLogout = () => {
     setUser(null)
@@ -45,25 +50,45 @@ export default function SignupPage() {
       return;
     }
 
-    const registeredUsers = useStore.getState().registeredUsers;
-    const isAlreadyRegistered = registeredUsers.some(u => u.email.toLowerCase() === cleanedEmail);
+    try {
+      // 1. Perform native Supabase Auth Sign Up
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: cleanedEmail,
+        password,
+      });
 
-    if (isAlreadyRegistered) {
-      setError('An account with this email already exists.');
+      if (signUpError || !data.user) {
+        setError(signUpError?.message || 'Failed to sign up.');
+        setLoading(false);
+        return;
+      }
+
+      // 2. Save corresponding app profile linked to the Auth UUID
+      const { error: profileError } = await syncService.saveUserProfile(
+        data.user.id,
+        cleanedEmail,
+        name
+      );
+
+      if (profileError) {
+        setError(profileError.message || 'Failed to save application profile.');
+        setLoading(false);
+        return;
+      }
+
+      // Register local backup registry mapping
+      useStore.getState().registerUser({
+        name,
+        email: cleanedEmail
+      });
+
+      setLoading(false)
+      alert("Registration successful! You can now log in.")
+      router.push('/login')
+    } catch (err: any) {
+      setError(err?.message || 'An unexpected error occurred during registration.');
       setLoading(false);
-      return;
     }
-
-    // Call store local signup procedure
-    useStore.getState().registerUser({
-      name,
-      email: cleanedEmail,
-      password // stored securely locally
-    });
-
-    setLoading(false)
-    alert("Account created successfully! You can now log in.")
-    router.push('/login')
   }
 
   // Already logged in blocker screen

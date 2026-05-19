@@ -3,7 +3,7 @@
 
 -- 1. Create Tasks Table
 CREATE TABLE IF NOT EXISTS public.tasks (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    id TEXT PRIMARY KEY,
     email TEXT NOT NULL,
     title TEXT NOT NULL,
     status TEXT CHECK (status IN ('todo', 'in-progress', 'done')) DEFAULT 'todo' NOT NULL,
@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS public.tasks (
 
 -- 2. Create Notes Table
 CREATE TABLE IF NOT EXISTS public.notes (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    id TEXT PRIMARY KEY,
     email TEXT NOT NULL,
     subject TEXT DEFAULT 'General Study' NOT NULL,
     title TEXT NOT NULL,
@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS public.notes (
 
 -- 3. Create Attendance Table
 CREATE TABLE IF NOT EXISTS public.attendance (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    id TEXT PRIMARY KEY,
     email TEXT NOT NULL,
     subject TEXT NOT NULL,
     attended INTEGER DEFAULT 0 NOT NULL,
@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS public.attendance (
 
 -- 4. Create Semesters Table
 CREATE TABLE IF NOT EXISTS public.semesters (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    id TEXT PRIMARY KEY,
     email TEXT NOT NULL,
     name TEXT NOT NULL,
     courses JSONB DEFAULT '[]'::JSONB
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS public.semesters (
 
 -- 5. Create Goals Table
 CREATE TABLE IF NOT EXISTS public.goals (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    id TEXT PRIMARY KEY,
     email TEXT NOT NULL,
     title TEXT NOT NULL,
     progress INTEGER DEFAULT 0 NOT NULL,
@@ -57,12 +57,34 @@ CREATE TABLE IF NOT EXISTS public.goals (
     status TEXT CHECK (status IN ('active', 'completed')) DEFAULT 'active' NOT NULL
 );
 
--- 6. Add High-Performance Search Indexes
+-- 6. Create Profiles Table (for user credentials)
+CREATE TABLE IF NOT EXISTS public.profiles (
+    id TEXT PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    profile_pic TEXT,
+    is_deleted BOOLEAN DEFAULT FALSE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 7. Create Timetable Table
+CREATE TABLE IF NOT EXISTS public.timetable (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    day TEXT NOT NULL,
+    start_time TEXT NOT NULL,
+    end_time TEXT NOT NULL
+);
+
+-- 8. Add High-Performance Search Indexes
 CREATE INDEX IF NOT EXISTS tasks_email_idx ON public.tasks(email);
 CREATE INDEX IF NOT EXISTS notes_email_idx ON public.notes(email);
 CREATE INDEX IF NOT EXISTS attendance_email_idx ON public.attendance(email);
 CREATE INDEX IF NOT EXISTS semesters_email_idx ON public.semesters(email);
 CREATE INDEX IF NOT EXISTS goals_email_idx ON public.goals(email);
+CREATE INDEX IF NOT EXISTS profiles_email_idx ON public.profiles(email);
+CREATE INDEX IF NOT EXISTS timetable_email_idx ON public.timetable(email);
 
 -- Enable RLS (Row Level Security) or allow full public auth access
 ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
@@ -70,6 +92,8 @@ ALTER TABLE public.notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.attendance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.semesters ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.goals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.timetable ENABLE ROW LEVEL SECURITY;
 
 -- Create Open Access Policies for Authenticated/Public Requests
 CREATE POLICY "Allow all public access to tasks" ON public.tasks FOR ALL USING (true) WITH CHECK (true);
@@ -77,3 +101,6 @@ CREATE POLICY "Allow all public access to notes" ON public.notes FOR ALL USING (
 CREATE POLICY "Allow all public access to attendance" ON public.attendance FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all public access to semesters" ON public.semesters FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all public access to goals" ON public.goals FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all public access to profiles" ON public.profiles FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all public access to timetable" ON public.timetable FOR ALL USING (true) WITH CHECK (true);
+
